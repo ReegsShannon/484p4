@@ -104,7 +104,7 @@ bool LogMgr::redo(vector <LogRecord*> log){
  * If a txnum is provided, abort that transaction.
  * Hint: the logic is very similar for these two tasks!
  */
-void LogMgr::undo(vector <LogRecord*> log, int txnum = NULL_TX){
+void LogMgr::undo(vector <LogRecord*> log, int txnum){
     
 }
 
