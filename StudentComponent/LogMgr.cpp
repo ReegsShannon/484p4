@@ -10,7 +10,7 @@ using namespace std;
  * the null LSN.
  */
 int getLastLSN(int txnum){
-    return tx_Table[txnum].lastLSN;
+    return this->tx_Table[txnum].lastLSN;
 }
 
 /*
