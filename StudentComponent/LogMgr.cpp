@@ -90,10 +90,10 @@ bool LogMgr::redo(vector <LogRecord*> log){
                 if(se->getLSN(cRecord->getPageID()) < cRecord->getLSN()){
                     if(cRecord->getType() == UPDATE){
                         UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(cRecord);
-                        if(!pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getAfterImage(), uRecord->getLSN())) return false;
+                        if(!se->pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getAfterImage(), uRecord->getLSN())) return false;
                     }
                     else{
-                        if(!pageWrite(cRecord->getPageID(), cRecord->getOffset(), cRecord->getAfterImage(), cRecord->getLSN())) return false;
+                        if(!se->pageWrite(cRecord->getPageID(), cRecord->getOffset(), cRecord->getAfterImage(), cRecord->getLSN())) return false;
                     }
                 }
             }
