@@ -14,6 +14,8 @@ struct CompareSecond
     }
 };
 
+int findLSN(vector <LogRecord*> log, int LSN);
+
 /*
  * Find the LSN of the most recent log record for this TX.
  * If there is no previous log record for this TX, return 
@@ -188,7 +190,7 @@ void LogMgr::setStorageEngine(StorageEngine* engine){
     this->se = engine;
 }
 
-int LogMgr::findLSN(vector <LogRecord*> log, int LSN){
+int findLSN(vector <LogRecord*> log, int LSN){
     for(int i = 0; i < log.size(); ++i){
         if(log[i]->getLSN() == LSN) return i;
     }
