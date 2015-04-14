@@ -38,8 +38,8 @@ void LogMgr::flushLogTail(int maxLSN){
  * Run the analysis phase of ARIES.
  */
 void LogMgr::analyze(vector <LogRecord*> log){
-    int checkNum = StorageEngine::get_master();
-    sstream::sstream ss (getLog());
+    int checkNum = se->get_master();
+    stringstream ss (getLog());
     string recordString;
     for(int i = 0; i < checkNum + 1; ++i){
         getline(ss, recordString);
@@ -78,7 +78,7 @@ void LogMgr::analyze(vector <LogRecord*> log){
  * Else when redo phase is complete, return true. 
  */
 bool LogMgr::redo(vector <LogRecord*> log){
-    sstream ss (getLog());
+    stringstream ss (getLog());
     string recordString;
     int firstDirty = min_element(mymap.begin(), mymap.end(), CompareSecond())->second;
     for(int i = 0; i < firstDirty; ++i){
