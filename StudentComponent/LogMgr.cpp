@@ -49,20 +49,11 @@ void LogMgr::flushLogTail(int maxLSN){
  */
 void LogMgr::analyze(vector <LogRecord*> log){
     int checkNum = se->get_master();
-    stringstream ss (se->getLog());
-    string recordString;
     LogRecord * newRecord;
-    ChkptLogRecord * checkpoint;
-    for(int i = 0; i < checkNum + 1; ++i){
-        getline(ss, recordString);
-    }
-    getline(ss, recordString);
-    checkpoint->stringToRecordPtr(recordString);
-    tx_table = checkpoint->getTxTable();
-    dirty_page_table = checkpoint->getDirtyPageTable();
-    while(!ss.eof()){
-        getline(ss, recordString);
-        newRecord->stringToRecordPtr(recordString);
+    tx_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getTxTable();
+    dirty_page_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getDirtyPageTable();
+    for(int i = checkNum + 2; i < log.size(); ++i){
+        newRecord = log[i];
         int txID = newRecord->getTxID();
         if (newRecord->getType() == END){
             tx_table.erase(txID); 
@@ -89,16 +80,10 @@ void LogMgr::analyze(vector <LogRecord*> log){
  * Else when redo phase is complete, return true. 
  */
 bool LogMgr::redo(vector <LogRecord*> log){
-    stringstream ss (se->getLog());
-    string recordString;
     LogRecord * newRecord;
     int firstDirty = min_element(dirty_page_table.begin(), dirty_page_table.end(), CompareSecond())->second;
-    for(int i = 0; i < firstDirty; ++i){
-        getline(ss, recordString);
-    }
-    while(!ss.eof()){
-        getline(ss, recordString);
-        newRecord->stringToRecordPtr(recordString);
+    for(int i = firstDirty; i < log.size(); ++i){
+        newRecord = log[i];
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
             if(dirty_page_table.count(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) && dirty_page_table[dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()] <= newRecord->getLSN()){
                 Page * p = &se->records[se->findPage(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID())];
@@ -123,6 +108,18 @@ bool LogMgr::redo(vector <LogRecord*> log){
  */
 void LogMgr::undo(vector <LogRecord*> log, int txnum = NULL_TX){
     
+}
+
+
+vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
+    vector<LogRecord*> result;
+    istringstream stream(logstring);
+    string line;
+    while (getline(stream, line)) {
+        LogRecord* lr->stringToRecordPtr(line);
+        result.push_back(lr);
+    }
+    return result; 
 }
 
 /*
