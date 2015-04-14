@@ -1,6 +1,7 @@
 #include "LogMgr.h"
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 using namespace std;
 
@@ -90,16 +91,17 @@ void LogMgr::analyze(vector <LogRecord*> log){
 bool LogMgr::redo(vector <LogRecord*> log){
     stringstream ss (se->getLog());
     string recordString;
+    LogRecord * newRecord;
     int firstDirty = min_element(dirty_page_table.begin(), dirty_page_table.end(), CompareSecond())->second;
     for(int i = 0; i < firstDirty; ++i){
         getline(ss, recordString);
     }
     while(!ss.eof()){
         getline(ss, recordString);
-        LogRecord * newRecord = stringToRecordPtr(endCheckPointString);
+        newRecord->stringToRecordPtr(recordString);
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
-            if(dirty_page_table.count(newRecord->getPageID()) && dirty_page_table[newRecord->getPageID()] <= newRecord->getLSN()){
-                Page * p = &records[se->findPage(newRecord->getPageID())];
+            if(dirty_page_table.count(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) && dirty_page_table[dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()] <= newRecord->getLSN()){
+                Page * p = &se->records[se->findPage(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID())];
                 if(p->pageLSN < newRecord->getLSN()){
                     if(newRecord->getType() == UPDATE){
                         
