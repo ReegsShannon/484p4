@@ -9,15 +9,15 @@ using namespace std;
  * If there is no previous log record for this TX, return 
  * the null LSN.
  */
-int getLastLSN(int txnum){
-    return this->tx_Table[txnum].lastLSN;
+int LogMgr::getLastLSN(int txnum){
+    return tx_Table[txnum].lastLSN;
 }
 
 /*
  * Update the TX table to reflect the LSN of the most recent
  * log entry for this transaction.
  */
-void setLastLSN(int txnum, int lsn){
+void LogMgr::setLastLSN(int txnum, int lsn){
     tx_Table[txnum].lastLSN = lsn;
 }
 
@@ -26,7 +26,7 @@ void setLastLSN(int txnum, int lsn){
  * maxLSN to disk. Don't forget to remove them from the
  * logtail once they're written!
  */
-void flushLogTail(int maxLSN){
+void LogMgr::flushLogTail(int maxLSN){
     for(int i = 0; i < logtail.size(); ++i){
         if(logtail[i].getLSN() <= maxLSN){
             se->updateLog(logtail[i]->toString());
@@ -37,7 +37,7 @@ void flushLogTail(int maxLSN){
 /* 
  * Run the analysis phase of ARIES.
  */
-void analyze(vector <LogRecord*> log){
+void LogMgr::analyze(vector <LogRecord*> log){
     int checkNum = get_master();
     sstream ss (getLog());
     string recordString;
@@ -77,7 +77,7 @@ void analyze(vector <LogRecord*> log){
  * If the StorageEngine stops responding, return false.
  * Else when redo phase is complete, return true. 
  */
-bool redo(vector <LogRecord*> log){
+bool LogMgr::redo(vector <LogRecord*> log){
     sstream ss (getLog());
     string recordString;
     int firstDirty = min_element(mymap.begin(), mymap.end(), CompareSecond())->second;
@@ -109,7 +109,7 @@ bool redo(vector <LogRecord*> log){
  * If a txnum is provided, abort that transaction.
  * Hint: the logic is very similar for these two tasks!
  */
-void undo(vector <LogRecord*> log, int txnum = NULL_TX){
+void LogMgr::undo(vector <LogRecord*> log, int txnum = NULL_TX){
     
 }
 
@@ -117,21 +117,21 @@ void undo(vector <LogRecord*> log, int txnum = NULL_TX){
  * Abort the specified transaction.
  * Hint: you can use your undo function
  */
-void abort(int txid){
+void LogMgr::abort(int txid){
     
 }
 
 /*
  * Write the begin checkpoint and end checkpoint
  */
-void checkpoint(){
+void LogMgr::checkpoint(){
     
 }
 
 /*
  * Commit the specified transaction.
  */
-void commit(int txid){
+void LogMgr::commit(int txid){
     
 }
 
@@ -140,28 +140,28 @@ void commit(int txid){
  * write a page to disk. 
  * Remember, you need to implement write-ahead logging
  */
-void pageFlushed(int page_id){
+void LogMgr::pageFlushed(int page_id){
     
 }
 
 /*
  * Recover from a crash, given the log from the disk.
  */
-void recover(string log){
+void LogMgr::recover(string log){
     
 }
 
 /*
  * Logs an update to the database and updates tables if needed.
  */
-int write(int txid, int page_id, int offset, string input, string oldtext){
+int LogMgr::write(int txid, int page_id, int offset, string input, string oldtext){
     
 }
 
 /*
  * Sets this.se to engine. 
  */
-void setStorageEngine(StorageEngine* engine){
+void LogMgr::setStorageEngine(StorageEngine* engine){
     this->se = engine;
 }
 
