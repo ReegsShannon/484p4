@@ -42,13 +42,14 @@ void LogMgr::analyze(vector <LogRecord*> log){
     stringstream ss (se->getLog());
     string recordString;
     LogRecord * newRecord;
+    ChkptLogRecord * checkpoint;
     for(int i = 0; i < checkNum + 1; ++i){
         getline(ss, recordString);
     }
     getline(ss, recordString);
-    newRecord->stringToRecordPtr(recordString);
-    tx_table = newRecord->getTxTable();
-    dirty_page_table = newRecord->getDirtyPageTable();
+    checkpoint->stringToRecordPtr(recordString);
+    tx_table = checkpoint->getTxTable();
+    dirty_page_table = checkpoint->getDirtyPageTable();
     while(!ss.eof()){
         getline(ss, recordString);
         newRecord->stringToRecordPtr(recordString);
