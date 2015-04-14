@@ -85,18 +85,21 @@ bool LogMgr::redo(vector <LogRecord*> log){
     for(int i = firstDirty; i < log.size(); ++i){
         newRecord = log[i];
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
-            if(dirty_page_table.count(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) && dirty_page_table[dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()] <= newRecord->getLSN()){
-                if(se->getLSN(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) < newRecord->getLSN()){
-                    if(newRecord->getType() == UPDATE){
-                        
+            CompensationLogRecord * cRecord = dynamic_cast<CompensationLogRecord *>(newRecord);
+            if(dirty_page_table.count(cRecord->getPageID()) && dirty_page_table[cRecord->getPageID()] <= cRecord->getLSN()){
+                if(se->getLSN(cRecord->getPageID()) < cRecord->getLSN()){
+                    if(cRecord->getType() == UPDATE){
+                        UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(cRecord);
+                        if(!pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getAfterImage(), uRecord->getLSN())) return false;
                     }
                     else{
-                        
+                        if(!pageWrite(cRecord->getPageID(), cRecord->getOffset(), cRecord->getAfterImage(), cRecord->getLSN())) return false;
                     }
                 }
             }
         }
     }
+    return true;
 }
 
 /*
@@ -140,7 +143,12 @@ void LogMgr::checkpoint(){
  * Commit the specified transaction.
  */
 void LogMgr::commit(int txid){
-    
+    int LSN = se->nextLSN();
+    logtail.push_back(new LogRecord(LSN, getLastLSN(txid), txid, COMMIT));
+    flushLogTail(LSN);
+    tx_table.erase(txid);
+    int LSN2 = se->nextLSN();
+    logtail.push_back(new LogRecord(LSN2, LSN, txid, END));
 }
 
 /*
@@ -163,7 +171,9 @@ void LogMgr::recover(string log){
  * Logs an update to the database and updates tables if needed.
  */
 int LogMgr::write(int txid, int page_id, int offset, string input, string oldtext){
-    
+    int LSN = se->nextLSN();
+    logtail.push_back(new UpdateLogRecord(LSN, getLastLSN(txid), txid, page_id, offset, input, oldtext));
+    return LSN;
 }
 
 /*
