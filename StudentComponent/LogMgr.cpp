@@ -77,7 +77,7 @@ void LogMgr::analyze(vector <LogRecord*> log){
             }
         }
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
-            dirty_page_table[newRecord->getPageID()] = newRecord->getLSN();
+            dirty_page_table[dynamic_cast<ChkptLogRecord *>(newRecord)->getPageID()] = newRecord->getLSN();
         }
     }
 }
