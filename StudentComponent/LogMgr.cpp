@@ -114,7 +114,8 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
     istringstream stream(logstring);
     string line;
     while (getline(stream, line)) {
-        LogRecord* lr->stringToRecordPtr(line);
+        LogRecord* lr;
+        lr->stringToRecordPtr(line);
         result.push_back(lr);
     }
     return result; 
@@ -171,12 +172,3 @@ int LogMgr::write(int txid, int page_id, int offset, string input, string oldtex
 void LogMgr::setStorageEngine(StorageEngine* engine){
     this->se = engine;
 }
-
-typedef std::pair<int, int> MyPairType;
-struct CompareSecond
-{
-    bool operator()(const MyPairType& left, const MyPairType& right) const
-    {
-        return left.second < right.second;
-    }
-};
