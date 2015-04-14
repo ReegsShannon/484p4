@@ -48,8 +48,8 @@ void LogMgr::flushLogTail(int maxLSN){
  * Run the analysis phase of ARIES.
  */
 void LogMgr::analyze(vector <LogRecord*> log){
-    int checkNum = se->get_master();
     LogRecord * newRecord;
+    int checkNum = findLSN(log, se->get_master());
     tx_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getTxTable();
     dirty_page_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getDirtyPageTable();
     for(int i = checkNum + 2; i < log.size(); ++i){
@@ -82,6 +82,7 @@ void LogMgr::analyze(vector <LogRecord*> log){
 bool LogMgr::redo(vector <LogRecord*> log){
     LogRecord * newRecord;
     int firstDirty = min_element(dirty_page_table.begin(), dirty_page_table.end(), CompareSecond())->second;
+    firstDirty = findLSN(log, firstDirty);
     for(int i = firstDirty; i < log.size(); ++i){
         newRecord = log[i];
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
@@ -136,7 +137,11 @@ void LogMgr::abort(int txid){
  * Write the begin checkpoint and end checkpoint
  */
 void LogMgr::checkpoint(){
-    
+    int LSN = se->nextLSN();
+    logtail.push_back(new LogRecord(LSN, NULL_LSN, NULL_TX, BEGIN_CKPT));
+    int LSN2 = se->nextLSN();
+    logtail.push_back(new ChkptLogRecord(LSN2, LSN, NULL_TX, tx_table, dirty_page_table));
+    se->store_master(LSN);
 }
 
 /*
@@ -157,7 +162,7 @@ void LogMgr::commit(int txid){
  * Remember, you need to implement write-ahead logging
  */
 void LogMgr::pageFlushed(int page_id){
-    
+    flushLogTail(se->getLSN(page_id));
 }
 
 /*
@@ -181,4 +186,11 @@ int LogMgr::write(int txid, int page_id, int offset, string input, string oldtex
  */
 void LogMgr::setStorageEngine(StorageEngine* engine){
     this->se = engine;
+}
+
+int LogMgr::findLSN(vector <LogRecord*> log, int LSN){
+    for(int i = 0; i < log.size(); ++i){
+        if(log[i]->getLSN() == LSN) return i;
+    }
+    return -1; 
 }
