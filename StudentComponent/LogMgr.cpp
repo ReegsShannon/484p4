@@ -39,14 +39,14 @@ void LogMgr::flushLogTail(int maxLSN){
  */
 void LogMgr::analyze(vector <LogRecord*> log){
     int checkNum = se->get_master();
-    stringstream ss (getLog());
+    stringstream ss (se->getLog());
     string recordString;
     for(int i = 0; i < checkNum + 1; ++i){
         getline(ss, recordString);
     }
     string endCheckPointString;
     getline(ss, endCheckPointString);
-    LogRecord * endCheckPoint = stringToRecordPtr(endCheckPointString);
+    LogRecord * endCheckPoint->stringToRecordPtr(endCheckPointString);
     tx_table = endCheckPoint->getTxTable();
     dirty_page_table = endCheckPoint->getDirtyPageTable();
     while(!ss.eof()){
