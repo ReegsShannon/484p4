@@ -4,6 +4,15 @@
 
 using namespace std;
 
+typedef std::pair<int, int> MyPairType;
+struct CompareSecond
+{
+    bool operator()(const MyPairType& left, const MyPairType& right) const
+    {
+        return left.second < right.second;
+    }
+};
+
 /*
  * Find the LSN of the most recent log record for this TX.
  * If there is no previous log record for this TX, return 
@@ -68,7 +77,7 @@ void LogMgr::analyze(vector <LogRecord*> log){
             }
         }
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
-            dirty_page_table[newRecord.getPageID()] = newRecord->getLSN();
+            dirty_page_table[newRecord->getPageID()] = newRecord->getLSN();
         }
     }
 }
@@ -79,9 +88,9 @@ void LogMgr::analyze(vector <LogRecord*> log){
  * Else when redo phase is complete, return true. 
  */
 bool LogMgr::redo(vector <LogRecord*> log){
-    stringstream ss (getLog());
+    stringstream ss (se->getLog());
     string recordString;
-    int firstDirty = min_element(mymap.begin(), mymap.end(), CompareSecond())->second;
+    int firstDirty = min_element(dirty_page_table.begin(), dirty_page_table.end(), CompareSecond())->second;
     for(int i = 0; i < firstDirty; ++i){
         getline(ss, recordString);
     }
