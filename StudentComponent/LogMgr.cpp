@@ -28,7 +28,7 @@ void LogMgr::setLastLSN(int txnum, int lsn){
  */
 void LogMgr::flushLogTail(int maxLSN){
     for(int i = 0; i < logtail.size(); ++i){
-        if(logtail[i].getLSN() <= maxLSN){
+        if(logtail[i]->getLSN() <= maxLSN){
             se->updateLog(logtail[i]->toString());
         }
     }
@@ -38,8 +38,8 @@ void LogMgr::flushLogTail(int maxLSN){
  * Run the analysis phase of ARIES.
  */
 void LogMgr::analyze(vector <LogRecord*> log){
-    int checkNum = get_master();
-    sstream ss (getLog());
+    int checkNum = StorageEngine::get_master();
+    sstream::sstream ss (getLog());
     string recordString;
     for(int i = 0; i < checkNum + 1; ++i){
         getline(ss, recordString);
