@@ -10,7 +10,7 @@ using namespace std;
  * the null LSN.
  */
 int LogMgr::getLastLSN(int txnum){
-    return tx_Table[txnum].lastLSN;
+    return tx_table[txnum].lastLSN;
 }
 
 /*
@@ -18,7 +18,7 @@ int LogMgr::getLastLSN(int txnum){
  * log entry for this transaction.
  */
 void LogMgr::setLastLSN(int txnum, int lsn){
-    tx_Table[txnum].lastLSN = lsn;
+    tx_table[txnum].lastLSN = lsn;
 }
 
 /*
