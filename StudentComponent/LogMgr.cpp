@@ -86,15 +86,13 @@ bool LogMgr::redo(vector <LogRecord*> log){
         newRecord = log[i];
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
             if(dirty_page_table.count(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) && dirty_page_table[dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()] <= newRecord->getLSN()){
-                Page * p = &se->records[se->findPage(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID())];
-                if(p->pageLSN < newRecord->getLSN()){
+                if(se->getLSN(dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()) < newRecord->getLSN()){
                     if(newRecord->getType() == UPDATE){
                         
                     }
                     else{
                         
                     }
-                    p->pageLSN = newRecord->getLSN();
                 }
             }
         }
