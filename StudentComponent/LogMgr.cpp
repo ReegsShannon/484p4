@@ -41,32 +41,32 @@ void LogMgr::analyze(vector <LogRecord*> log){
     int checkNum = se->get_master();
     stringstream ss (se->getLog());
     string recordString;
+    LogRecord * newRecord;
     for(int i = 0; i < checkNum + 1; ++i){
         getline(ss, recordString);
     }
-    string endCheckPointString;
-    getline(ss, endCheckPointString);
-    LogRecord * endCheckPoint->stringToRecordPtr(endCheckPointString);
-    tx_table = endCheckPoint->getTxTable();
-    dirty_page_table = endCheckPoint->getDirtyPageTable();
+    getline(ss, recordString);
+    newRecord->stringToRecordPtr(recordString);
+    tx_table = newRecord->getTxTable();
+    dirty_page_table = newRecord->getDirtyPageTable();
     while(!ss.eof()){
         getline(ss, recordString);
-        LogRecord * newRecord = stringToRecordPtr(recordString);
-        int txID = newRecord.getTxID();
-        if (newRecord.getType == END){
-            tx_table.remove(txID); 
+        newRecord->stringToRecordPtr(recordString);
+        int txID = newRecord->getTxID();
+        if (newRecord->getType() == END){
+            tx_table.erase(txID); 
         }
         else{
             txTableEntry * tableEntry = &tx_table[txID];
             tableEntry->lastLSN = newRecord->getLSN();
-            if(newRecord.getType() == COMMIT){
+            if(newRecord->getType() == COMMIT){
                 tableEntry->status = C;
             }
             else{
                 tableEntry->status = U;
             }
         }
-        if(newRecord.getType == UPDATE || newRecord.getType == CLR){
+        if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
             dirty_page_table[newRecord.getPageID()] = newRecord->getLSN();
         }
     }
@@ -87,11 +87,11 @@ bool LogMgr::redo(vector <LogRecord*> log){
     while(!ss.eof()){
         getline(ss, recordString);
         LogRecord * newRecord = stringToRecordPtr(endCheckPointString);
-        if(newRecord->type == UPDATE || newRecord->type == CLR){
+        if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
             if(dirty_page_table.count(newRecord->getPageID()) && dirty_page_table[newRecord->getPageID()] <= newRecord->getLSN()){
-                Page * p = &records[findPage(newRecord->getPageID())];
+                Page * p = &records[se->findPage(newRecord->getPageID())];
                 if(p->pageLSN < newRecord->getLSN()){
-                    if(newRecord->type == UPDATE){
+                    if(newRecord->getType() == UPDATE){
                         
                     }
                     else{
