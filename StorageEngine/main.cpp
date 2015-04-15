@@ -72,6 +72,7 @@ void runTestcase(string filename) {
       se.end_crash(lm);
     }
     else if (ifcrash == "end") {
+      cout << se.getOutputFileName() << endl;
       se.end(se.getOutputFileName());
       break;
     } 

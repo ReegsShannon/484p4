@@ -2,6 +2,8 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <queue>
+#include <iostream>
 
 using namespace std;
 
@@ -11,6 +13,14 @@ struct CompareSecond
     bool operator()(const MyPairType& left, const MyPairType& right) const
     {
         return left.second < right.second;
+    }
+};
+
+struct ToUndoComp
+{
+    bool operator()(LogRecord * left, LogRecord * right) 
+    {
+        return left->getLSN() > right->getLSN();
     }
 };
 
@@ -39,10 +49,10 @@ void LogMgr::setLastLSN(int txnum, int lsn){
  * logtail once they're written!
  */
 void LogMgr::flushLogTail(int maxLSN){
-    for(int i = 0; i < logtail.size(); ++i){
-        if(logtail[i]->getLSN() <= maxLSN){
-            se->updateLog(logtail[i]->toString());
-        }
+    while(!logtail.empty() && logtail.front()->getLSN() <= maxLSN){
+        se->updateLog(logtail.front()->toString());
+        delete logtail.front();
+        logtail.erase(logtail.begin());
     }
 }
 
@@ -50,24 +60,34 @@ void LogMgr::flushLogTail(int maxLSN){
  * Run the analysis phase of ARIES.
  */
 void LogMgr::analyze(vector <LogRecord*> log){
+    int a;
+    cin >> a;
     LogRecord * newRecord;
     int checkNum = findLSN(log, se->get_master());
-    tx_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getTxTable();
-    dirty_page_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getDirtyPageTable();
-    for(int i = checkNum + 2; i < log.size(); ++i){
+    if(checkNum == NULL_LSN){
+        checkNum = 0;
+    }
+    else{
+        tx_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getTxTable();
+        dirty_page_table = dynamic_cast<ChkptLogRecord *>(log[checkNum + 1])->getDirtyPageTable();
+        checkNum += 2;
+    }
+    
+    for(int i = checkNum; i < log.size(); ++i){
         newRecord = log[i];
+        //cout << newRecord->toString() << endl;
         int txID = newRecord->getTxID();
         if (newRecord->getType() == END){
             tx_table.erase(txID); 
         }
         else{
-            txTableEntry * tableEntry = &tx_table[txID];
-            tableEntry->lastLSN = newRecord->getLSN();
+            tx_table[txID].lastLSN = newRecord->getLSN();
             if(newRecord->getType() == COMMIT){
-                tableEntry->status = C;
+                cout << "Set to C" << endl;
+                tx_table[txID].status = C;
             }
             else{
-                tableEntry->status = U;
+                tx_table[txID].status = U;
             }
         }
         if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
@@ -102,6 +122,12 @@ bool LogMgr::redo(vector <LogRecord*> log){
             }
         }
     }
+    for(map<int, txTableEntry>::iterator it = tx_table.begin(); it != tx_table.end(); it++){
+        if(it->second.status == C){
+            logtail.push_back(new LogRecord(se->nextLSN(), it->second.lastLSN, it->first, END));
+        }
+    }
+    
     return true;
 }
 
@@ -111,7 +137,37 @@ bool LogMgr::redo(vector <LogRecord*> log){
  * Hint: the logic is very similar for these two tasks!
  */
 void LogMgr::undo(vector <LogRecord*> log, int txnum){
-    
+    priority_queue <LogRecord *, vector<LogRecord *>, ToUndoComp> ToUndo;
+    if(txnum == NULL_TX){
+        for(map<int, txTableEntry>::iterator it = tx_table.begin(); it != tx_table.end(); it++){
+            ToUndo.push(log[findLSN(log,it->second.lastLSN)]);
+        }
+    }
+    else{
+        ToUndo.push(log[findLSN(log,tx_table[txnum].lastLSN)]);
+    }
+    while(!ToUndo.empty()){
+        LogRecord * newRecord = ToUndo.top();
+        ToUndo.pop();
+        if(newRecord->getType() == CLR){
+            CompensationLogRecord * cRecord = dynamic_cast<CompensationLogRecord *>(newRecord);
+            if(cRecord->getUndoNextLSN() == NULL_LSN){
+                LogRecord e(se->nextLSN(), cRecord->getLSN(), cRecord->getTxID(), END);
+                //se->updateLog(e.toString());
+                logtail.push_back(new LogRecord (se->nextLSN(), cRecord->getLSN(), cRecord->getTxID(), END));
+                tx_table.erase(cRecord->getTxID());
+            }
+            else{
+                ToUndo.push(log[findLSN(log,cRecord->getUndoNextLSN())]);
+            }
+        }
+        else if(newRecord->getType() == UPDATE){
+            UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(newRecord);
+            if(!se->pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getBeforeImage(), uRecord->getprevLSN())) return;
+            CompensationLogRecord c(se->nextLSN(), uRecord->getLSN(), uRecord->getTxID(), uRecord->getPageID(), uRecord->getOffset(), uRecord->getBeforeImage(), uRecord->getprevLSN());
+            ToUndo.push(log[findLSN(log,uRecord->getprevLSN())]);
+        }
+    }
 }
 
 
@@ -121,7 +177,12 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
     string line;
     while (getline(stream, line)) {
         LogRecord* lr;
+        cout << line << endl;
         lr->stringToRecordPtr(line);
+        cout << "LSN: " << lr->getLSN() << endl;
+        cout << "prevLSN: " << lr->getprevLSN() << endl;
+        cout << "TXID: " << lr->getTxID() << endl;
+        cout << "Type: " << lr->getType() << endl;
         result.push_back(lr);
     }
     return result; 
@@ -132,7 +193,7 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
  * Hint: you can use your undo function
  */
 void LogMgr::abort(int txid){
-    
+    undo(stringToLRVector(se->getLog()),txid);
 }
 
 /*
@@ -171,7 +232,13 @@ void LogMgr::pageFlushed(int page_id){
  * Recover from a crash, given the log from the disk.
  */
 void LogMgr::recover(string log){
-    
+    vector<LogRecord*> v = stringToLRVector(log);
+    for(int i = 0; i < v.size(); ++i){
+        //cout << v[i]->getType() << endl;
+    }
+    analyze(v);
+    if(!redo(v)) return;
+    undo(v);
 }
 
 /*
@@ -179,7 +246,11 @@ void LogMgr::recover(string log){
  */
 int LogMgr::write(int txid, int page_id, int offset, string input, string oldtext){
     int LSN = se->nextLSN();
-    logtail.push_back(new UpdateLogRecord(LSN, getLastLSN(txid), txid, page_id, offset, input, oldtext));
+    if(!tx_table.count(txid)) setLastLSN(txid, NULL_LSN);
+    logtail.push_back(new UpdateLogRecord(LSN, getLastLSN(txid), txid, page_id, offset, oldtext, input));
+    tx_table[txid].lastLSN = LSN;
+    tx_table[txid].status = U;
+    if(!dirty_page_table.count(page_id)) dirty_page_table[page_id] = LSN;
     return LSN;
 }
 
@@ -190,6 +261,7 @@ void LogMgr::setStorageEngine(StorageEngine* engine){
     this->se = engine;
 }
 
+//Given a vector of Records and a LSN, returns the index of the record with that LSN
 int findLSN(vector <LogRecord*> log, int LSN){
     for(int i = 0; i < log.size(); ++i){
         if(log[i]->getLSN() == LSN) return i;
