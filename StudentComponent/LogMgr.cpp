@@ -52,6 +52,7 @@ void LogMgr::flushLogTail(int maxLSN){
     while(!logtail.empty() && logtail.front()->getLSN() <= maxLSN){
         se->updateLog(logtail.front()->toString());
         delete logtail.front();
+        *(logtail.begin()) = nullptr;
         logtail.erase(logtail.begin());
     }
 }
@@ -60,8 +61,8 @@ void LogMgr::flushLogTail(int maxLSN){
  * Run the analysis phase of ARIES.
  */
 void LogMgr::analyze(vector <LogRecord*> log){
-    int a;
-    cin >> a;
+    //int a;
+    //cin >> a;
     LogRecord * newRecord;
     int checkNum = findLSN(log, se->get_master());
     if(checkNum == NULL_LSN){
@@ -75,7 +76,6 @@ void LogMgr::analyze(vector <LogRecord*> log){
     
     for(int i = checkNum; i < log.size(); ++i){
         newRecord = log[i];
-        //cout << newRecord->toString() << endl;
         int txID = newRecord->getTxID();
         if (newRecord->getType() == END){
             tx_table.erase(txID); 
@@ -83,15 +83,17 @@ void LogMgr::analyze(vector <LogRecord*> log){
         else{
             tx_table[txID].lastLSN = newRecord->getLSN();
             if(newRecord->getType() == COMMIT){
-                cout << "Set to C" << endl;
                 tx_table[txID].status = C;
             }
             else{
                 tx_table[txID].status = U;
             }
         }
-        if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
+        if(newRecord->getType() == CLR){
             dirty_page_table[dynamic_cast<CompensationLogRecord *>(newRecord)->getPageID()] = newRecord->getLSN();
+        }
+        else if(newRecord->getType() == UPDATE){
+            dirty_page_table[dynamic_cast<UpdateLogRecord *>(newRecord)->getPageID()] = newRecord->getLSN();
         }
     }
 }
@@ -107,24 +109,30 @@ bool LogMgr::redo(vector <LogRecord*> log){
     firstDirty = findLSN(log, firstDirty);
     for(int i = firstDirty; i < log.size(); ++i){
         newRecord = log[i];
-        if(newRecord->getType() == UPDATE || newRecord->getType() == CLR){
+        if(newRecord->getType() == CLR){
             CompensationLogRecord * cRecord = dynamic_cast<CompensationLogRecord *>(newRecord);
             if(dirty_page_table.count(cRecord->getPageID()) && dirty_page_table[cRecord->getPageID()] <= cRecord->getLSN()){
                 if(se->getLSN(cRecord->getPageID()) < cRecord->getLSN()){
-                    if(cRecord->getType() == UPDATE){
-                        UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(cRecord);
-                        if(!se->pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getAfterImage(), uRecord->getLSN())) return false;
-                    }
-                    else{
-                        if(!se->pageWrite(cRecord->getPageID(), cRecord->getOffset(), cRecord->getAfterImage(), cRecord->getLSN())) return false;
-                    }
+                    if(!se->pageWrite(cRecord->getPageID(), cRecord->getOffset(), cRecord->getAfterImage(), cRecord->getLSN())) return false;
+                }
+            }
+        }
+        else if(newRecord->getType() == UPDATE){
+            UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(newRecord);
+            if(dirty_page_table.count(uRecord->getPageID()) && dirty_page_table[uRecord->getPageID()] <= uRecord->getLSN()){
+                if(se->getLSN(uRecord->getPageID()) < uRecord->getLSN()){
+                    if(!se->pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getAfterImage(), uRecord->getLSN())) return false;
                 }
             }
         }
     }
-    for(map<int, txTableEntry>::iterator it = tx_table.begin(); it != tx_table.end(); it++){
+    for(map<int, txTableEntry>::iterator it = tx_table.begin(); it != tx_table.end(); ){
         if(it->second.status == C){
             logtail.push_back(new LogRecord(se->nextLSN(), it->second.lastLSN, it->first, END));
+            tx_table.erase(it++);
+        }
+        else{
+            ++it;
         }
     }
     
@@ -149,6 +157,7 @@ void LogMgr::undo(vector <LogRecord*> log, int txnum){
     while(!ToUndo.empty()){
         LogRecord * newRecord = ToUndo.top();
         ToUndo.pop();
+        //cout << newRecord->toString() << endl;
         if(newRecord->getType() == CLR){
             CompensationLogRecord * cRecord = dynamic_cast<CompensationLogRecord *>(newRecord);
             if(cRecord->getUndoNextLSN() == NULL_LSN){
@@ -164,8 +173,19 @@ void LogMgr::undo(vector <LogRecord*> log, int txnum){
         else if(newRecord->getType() == UPDATE){
             UpdateLogRecord * uRecord = dynamic_cast<UpdateLogRecord *>(newRecord);
             if(!se->pageWrite(uRecord->getPageID(), uRecord->getOffset(), uRecord->getBeforeImage(), uRecord->getprevLSN())) return;
-            CompensationLogRecord c(se->nextLSN(), uRecord->getLSN(), uRecord->getTxID(), uRecord->getPageID(), uRecord->getOffset(), uRecord->getBeforeImage(), uRecord->getprevLSN());
-            ToUndo.push(log[findLSN(log,uRecord->getprevLSN())]);
+            int cLSN = se->nextLSN();
+            logtail.push_back(new CompensationLogRecord (cLSN, getLastLSN(uRecord->getTxID()), uRecord->getTxID(), uRecord->getPageID(), uRecord->getOffset(), uRecord->getBeforeImage(), uRecord->getprevLSN()));
+            setLastLSN(uRecord->getTxID(), cLSN);
+            if(uRecord->getprevLSN() != NULL_LSN){
+                ToUndo.push(log[findLSN(log,uRecord->getprevLSN())]);
+            }
+            else{
+                logtail.push_back(new LogRecord (se->nextLSN(), cLSN, uRecord->getTxID(), END));
+                tx_table.erase(uRecord->getTxID());
+            }
+        }
+        else{
+            ToUndo.push(log[findLSN(log,newRecord->getprevLSN())]);
         }
     }
 }
@@ -177,12 +197,8 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
     string line;
     while (getline(stream, line)) {
         LogRecord* lr;
-        cout << line << endl;
-        lr->stringToRecordPtr(line);
-        cout << "LSN: " << lr->getLSN() << endl;
-        cout << "prevLSN: " << lr->getprevLSN() << endl;
-        cout << "TXID: " << lr->getTxID() << endl;
-        cout << "Type: " << lr->getType() << endl;
+        //cout << line << endl;
+        lr = LogRecord::stringToRecordPtr(line);
         result.push_back(lr);
     }
     return result; 
@@ -193,6 +209,10 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
  * Hint: you can use your undo function
  */
 void LogMgr::abort(int txid){
+    int LSN = se->nextLSN();
+    logtail.push_back(new LogRecord(LSN, getLastLSN(txid), txid, ABORT));
+    setLastLSN(txid,LSN);
+    flushLogTail(LSN);
     undo(stringToLRVector(se->getLog()),txid);
 }
 
@@ -204,6 +224,7 @@ void LogMgr::checkpoint(){
     logtail.push_back(new LogRecord(LSN, NULL_LSN, NULL_TX, BEGIN_CKPT));
     int LSN2 = se->nextLSN();
     logtail.push_back(new ChkptLogRecord(LSN2, LSN, NULL_TX, tx_table, dirty_page_table));
+    flushLogTail(LSN2);
     se->store_master(LSN);
 }
 
@@ -233,9 +254,6 @@ void LogMgr::pageFlushed(int page_id){
  */
 void LogMgr::recover(string log){
     vector<LogRecord*> v = stringToLRVector(log);
-    for(int i = 0; i < v.size(); ++i){
-        //cout << v[i]->getType() << endl;
-    }
     analyze(v);
     if(!redo(v)) return;
     undo(v);
@@ -248,7 +266,7 @@ int LogMgr::write(int txid, int page_id, int offset, string input, string oldtex
     int LSN = se->nextLSN();
     if(!tx_table.count(txid)) setLastLSN(txid, NULL_LSN);
     logtail.push_back(new UpdateLogRecord(LSN, getLastLSN(txid), txid, page_id, offset, oldtext, input));
-    tx_table[txid].lastLSN = LSN;
+    setLastLSN(txid, LSN);
     tx_table[txid].status = U;
     if(!dirty_page_table.count(page_id)) dirty_page_table[page_id] = LSN;
     return LSN;
