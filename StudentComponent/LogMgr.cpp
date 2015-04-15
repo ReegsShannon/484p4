@@ -3,7 +3,6 @@
 #include <string>
 #include <algorithm>
 #include <queue>
-#include <iostream>
 
 using namespace std;
 
@@ -157,12 +156,10 @@ void LogMgr::undo(vector <LogRecord*> log, int txnum){
     while(!ToUndo.empty()){
         LogRecord * newRecord = ToUndo.top();
         ToUndo.pop();
-        //cout << newRecord->toString() << endl;
         if(newRecord->getType() == CLR){
             CompensationLogRecord * cRecord = dynamic_cast<CompensationLogRecord *>(newRecord);
             if(cRecord->getUndoNextLSN() == NULL_LSN){
                 LogRecord e(se->nextLSN(), cRecord->getLSN(), cRecord->getTxID(), END);
-                //se->updateLog(e.toString());
                 logtail.push_back(new LogRecord (se->nextLSN(), cRecord->getLSN(), cRecord->getTxID(), END));
                 tx_table.erase(cRecord->getTxID());
             }
@@ -197,7 +194,6 @@ vector<LogRecord*> LogMgr::stringToLRVector(string logstring){
     string line;
     while (getline(stream, line)) {
         LogRecord* lr;
-        //cout << line << endl;
         lr = LogRecord::stringToRecordPtr(line);
         result.push_back(lr);
     }
